@@ -14,7 +14,7 @@ As a consequence, breaking changes that are specific to this provider (rather th
 
 ### Added
 
-- **Triggers.** SQLite triggers run an inline `BEGIN … END` body, which the provider now supports, using the inline trigger `Body` added in `NSchema.Core` 3.2.0. A trigger is generated as `CREATE TRIGGER … {BEFORE|AFTER} {event} ON t [FOR EACH ROW] [WHEN (…)] BEGIN … END` and recovered from `sqlite_master`.
+- **Trigger Support.** SQLite triggers run an inline `BEGIN … END` body, which the provider now supports, using the inline trigger `Body` added in `NSchema.Core` 3.2.0. A trigger is generated as `CREATE TRIGGER … {BEFORE|AFTER} {event} ON t [FOR EACH ROW] [WHEN (…)] BEGIN … END` and recovered from `sqlite_master`.
 
 ### Changed
 
