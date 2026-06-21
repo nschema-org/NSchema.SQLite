@@ -1,0 +1,13 @@
+﻿{
+  Statements: [
+    {
+      Sql: ALTER TABLE "main"."old_users" RENAME TO "users",
+      RunOutsideTransaction: false
+    },
+    {
+      Sql: DROP TABLE "main"."legacy",
+      RunOutsideTransaction: false
+    }
+  ],
+  IsEmpty: false
+}
