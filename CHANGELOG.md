@@ -10,6 +10,10 @@ This package uses **lockstep major versioning** with the `NSchema.Core` package:
 
 As a consequence, breaking changes that are specific to this provider (rather than the core API) are signalled by a **minor version bump** rather than a major one, and called out explicitly in this changelog.
 
+## [Unreleased]
+
+Nothing yet! Just documentation changes :)
+
 ## [3.0.1] - 2026-06-21
 
 ### Fixed
@@ -31,4 +35,5 @@ First release of the SQLite provider for NSchema, tracking NSchema 3.0.0.
 - `SqliteSqlGenerator` — `ISqlGenerator` implementation that translates an NSchema `MigrationPlan` into SQLite DDL, supporting the features SQLite has and raising a clear `NotSupportedException` for those it does not.
 - SourceLink and symbol packages (`.snupkg`) published alongside the main package for source-level debugging.
 
+[3.0.1]: https://github.com/nschema-org/NSchema.SQLite/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/nschema-org/NSchema.SQLite/releases/tag/v3.0.0
