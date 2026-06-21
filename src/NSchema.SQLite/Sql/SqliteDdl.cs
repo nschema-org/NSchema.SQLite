@@ -81,11 +81,19 @@ internal static class SqliteDdl
             switch (c)
             {
                 case '-' when i + 1 < sql.Length && sql[i + 1] == '-':
-                    while (i < sql.Length && sql[i] != '\n') i++;
+                    while (i < sql.Length && sql[i] != '\n')
+                    {
+                        i++;
+                    }
+
                     continue;
                 case '/' when i + 1 < sql.Length && sql[i + 1] == '*':
                     i += 2;
-                    while (i + 1 < sql.Length && !(sql[i] == '*' && sql[i + 1] == '/')) i++;
+                    while (i + 1 < sql.Length && !(sql[i] == '*' && sql[i + 1] == '/'))
+                    {
+                        i++;
+                    }
+
                     i += 2;
                     continue;
                 case '(':
@@ -105,7 +113,11 @@ internal static class SqliteDdl
             if (IsWordChar(c))
             {
                 var start = i;
-                while (i < sql.Length && IsWordChar(sql[i])) i++;
+                while (i < sql.Length && IsWordChar(sql[i]))
+                {
+                    i++;
+                }
+
                 tokens.Add(new SqliteToken(SqliteTokenKind.Word, sql[start..i]));
                 continue;
             }
@@ -544,7 +556,11 @@ internal static class SqliteDdl
             if (IsWordChar(c))
             {
                 var start = i;
-                while (i < sql.Length && IsWordChar(sql[i])) i++;
+                while (i < sql.Length && IsWordChar(sql[i]))
+                {
+                    i++;
+                }
+
                 if (string.Equals(sql[start..i], keyword, StringComparison.OrdinalIgnoreCase))
                 {
                     return sql[i..].Trim();
