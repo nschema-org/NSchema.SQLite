@@ -20,9 +20,9 @@ using NSchema.Schema.Model.Tables;
 using NSchema.Schema.Model.Triggers;
 using NSchema.Schema.Model.Views;
 using NSchema.Sql;
-using NSchema.SQLite.Sql;
+using NSchema.Sqlite.Sql;
 
-namespace NSchema.SQLite.Tests.Sql;
+namespace NSchema.Sqlite.Tests.Sql;
 
 /// <summary>
 /// Snapshot tests for <see cref="SqliteSqlGenerator"/>: they assert on the exact SQL text the generator emits
@@ -57,7 +57,7 @@ public sealed class SqliteSqlGeneratorSnapshotTests
     public Task CreateTable_WithAllConstraints_InlinesThemAndFoldsSeparateAddActions()
     {
         // The linearizer creates a table with only columns + PK inline, then emits the foreign keys, unique and
-        // check constraints as separate Add* actions. SQLite can't ALTER TABLE ADD CONSTRAINT, so the generator
+        // check constraints as separate Add* actions. Sqlite can't ALTER TABLE ADD CONSTRAINT, so the generator
         // inlines them into the CREATE TABLE and folds the separate actions away — the snapshot must show one
         // CREATE TABLE carrying everything, and nothing after it.
         var table = new Table("orders",
@@ -118,7 +118,7 @@ public sealed class SqliteSqlGeneratorSnapshotTests
 
     [Fact]
     public Task ViewOperations() => VerifyPlan(
-        // CreateView serves both add and body-modify; SQLite has no CREATE OR REPLACE, so each is DROP + CREATE.
+        // CreateView serves both add and body-modify; Sqlite has no CREATE OR REPLACE, so each is DROP + CREATE.
         new CreateView(Schema, new View("active_users", "SELECT id, email FROM main.users WHERE active")),
         new DropView(Schema, "active_users"));
 
@@ -153,7 +153,7 @@ public sealed class SqliteSqlGeneratorSnapshotTests
 
     private static Column Col(string name, SqlType type) => new(name, type);
 
-    // ── Comments are no-ops (SQLite has no COMMENT ON) ──────────────────────────
+    // ── Comments are no-ops (Sqlite has no COMMENT ON) ──────────────────────────
 
     [Fact]
     public void CommentActions_ProduceNoStatements()

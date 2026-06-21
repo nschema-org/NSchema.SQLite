@@ -5,7 +5,7 @@
     <File Path="Directory.Packages.props" />
   </Folder>
   <Folder Name="/sqlite/">
-    <Project Path="src/NSchema.SQLite/NSchema.SQLite.csproj" />
-    <Project Path="tests/NSchema.SQLite.Tests/NSchema.SQLite.Tests.csproj" />
+    <Project Path="src/NSchema.Sqlite/NSchema.Sqlite.csproj" />
+    <Project Path="tests/NSchema.Sqlite.Tests/NSchema.Sqlite.Tests.csproj" />
   </Folder>
 </Solution>

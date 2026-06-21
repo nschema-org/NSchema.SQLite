@@ -1,16 +1,16 @@
 using NSchema.Schema.Model.Indexes;
 using NSchema.Schema.Model.Tables;
 
-namespace NSchema.SQLite.Sql;
+namespace NSchema.Sqlite.Sql;
 
-// SQLite's PRAGMAs do not expose constraint names, check expressions, generated-column expressions, or the
-// columns of an expression index. The only place those survive is the original CREATE statement, which SQLite
+// Sqlite's PRAGMAs do not expose constraint names, check expressions, generated-column expressions, or the
+// columns of an expression index. The only place those survive is the original CREATE statement, which Sqlite
 // stores verbatim in `sqlite_master.sql`. This is a focused parser over that text: a small tokenizer (which
 // collapses any balanced `(...)` run into a single token, so nested parens, type facets and comma-separated
 // lists inside an expression never confuse the top level) plus per-statement extractors.
 //
 // It is deliberately tolerant — anything it cannot interpret is skipped rather than throwing — because the goal
-// is to recover the author's names and expressions, not to fully validate SQLite syntax. Column facts
+// is to recover the author's names and expressions, not to fully validate Sqlite syntax. Column facts
 // (type/nullability/default) come from PRAGMA table_xinfo instead, so this never has to parse a DEFAULT value.
 
 internal enum SqliteTokenKind
@@ -62,7 +62,7 @@ internal static class SqliteDdl
 
     /// <summary>
     /// Tokenizes a span of SQL. A balanced <c>(...)</c> run becomes one <see cref="SqliteTokenKind.Parens"/> token
-    /// (its inner text); identifiers in any of SQLite's quoting styles (<c>"" `` []</c>) become unquoted
+    /// (its inner text); identifiers in any of Sqlite's quoting styles (<c>"" `` []</c>) become unquoted
     /// <see cref="SqliteTokenKind.Word"/> tokens flagged <c>Quoted</c>; string literals are kept raw.
     /// </summary>
     public static List<SqliteToken> Tokenize(string sql)
@@ -181,7 +181,7 @@ internal static class SqliteDdl
             var c = sql[i];
             if (c == close)
             {
-                // A doubled closing delimiter is an escaped delimiter (SQLite allows "" and ]] in this position).
+                // A doubled closing delimiter is an escaped delimiter (Sqlite allows "" and ]] in this position).
                 if (i + 1 < sql.Length && sql[i + 1] == close && open == close)
                 {
                     sb.Append(close);

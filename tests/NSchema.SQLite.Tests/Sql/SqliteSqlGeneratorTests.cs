@@ -8,13 +8,13 @@ using NSchema.Schema.Model.Constraints;
 using NSchema.Schema.Model.Indexes;
 using NSchema.Schema.Model.Tables;
 using NSchema.Schema.Model.Views;
-using NSchema.SQLite.Tests.Fixtures;
+using NSchema.Sqlite.Tests.Fixtures;
 
-namespace NSchema.SQLite.Tests.Sql;
+namespace NSchema.Sqlite.Tests.Sql;
 
 /// <summary>
-/// Executes the generated SQL against a real SQLite database and asserts on the result — both that the DDL is
-/// valid SQLite and that what is applied reads back through the provider unchanged (no phantom drift on a re-plan).
+/// Executes the generated SQL against a real Sqlite database and asserts on the result — both that the DDL is
+/// valid Sqlite and that what is applied reads back through the provider unchanged (no phantom drift on a re-plan).
 /// </summary>
 public sealed class SqliteSqlGeneratorTests : SqliteTestBase
 {
@@ -124,7 +124,7 @@ public sealed class SqliteSqlGeneratorTests : SqliteTestBase
     [Fact]
     public async Task CreateView_OnExistingView_ReplacesDefinition()
     {
-        // CreateView serves both add and body-modify; SQLite has no CREATE OR REPLACE, so the generator drops first.
+        // CreateView serves both add and body-modify; Sqlite has no CREATE OR REPLACE, so the generator drops first.
         await Exec("CREATE TABLE \"users\" (id integer, email text)");
         await Exec("CREATE VIEW \"u\" AS SELECT id FROM \"users\"");
 
@@ -149,7 +149,7 @@ public sealed class SqliteSqlGeneratorTests : SqliteTestBase
     [Fact]
     public async Task RoundTrip_RichTable_IntrospectsToTheSameStructure()
     {
-        // A table with every kind of constraint NSchema can carry on SQLite. The linearizer would emit the FK,
+        // A table with every kind of constraint NSchema can carry on Sqlite. The linearizer would emit the FK,
         // unique and check as separate Add* actions; the generator inlines them. What is applied must read back
         // with the author's constraint names intact, or a re-plan would churn.
         var users = new Table("users",

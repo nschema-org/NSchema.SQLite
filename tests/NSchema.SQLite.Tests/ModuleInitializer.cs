@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace NSchema.SQLite.Tests;
+namespace NSchema.Sqlite.Tests;
 
 internal static class ModuleInitializer
 {

@@ -3,7 +3,7 @@ using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace NSchema.SQLite.Tests;
+namespace NSchema.Sqlite.Tests;
 
 /// <summary>
 /// Covers the service registrations <see cref="NSchemaApplicationBuilderExtensions.UseSqliteSchema(NSchemaApplicationBuilder, string)"/>
@@ -41,7 +41,7 @@ public sealed class NSchemaApplicationBuilderExtensionsTests : IDisposable
         // Act — the core SqlExecutor resolves a DbDataSource to apply a plan; without one, apply throws.
         var dataSource = services.GetService<DbDataSource>();
 
-        // Assert — it is registered, and it opens a real SQLite connection against the configured database.
+        // Assert — it is registered, and it opens a real Sqlite connection against the configured database.
         dataSource.ShouldNotBeNull();
         await using var connection = await dataSource.OpenConnectionAsync(TestContext.Current.CancellationToken);
         connection.ShouldBeOfType<SqliteConnection>();

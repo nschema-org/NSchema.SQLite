@@ -18,14 +18,14 @@ using NSchema.Schema.Model.Tables;
 using NSchema.Sql;
 using NSchema.Sql.Model;
 
-namespace NSchema.SQLite.Sql;
+namespace NSchema.Sqlite.Sql;
 
 /// <summary>
-/// Translates an NSchema <see cref="MigrationPlan"/> into SQLite DDL. Objects are qualified as
-/// <c>"schema"."name"</c> (the schema is always <c>main</c>), which is valid SQLite.
+/// Translates an NSchema <see cref="MigrationPlan"/> into Sqlite DDL. Objects are qualified as
+/// <c>"schema"."name"</c> (the schema is always <c>main</c>), which is valid Sqlite.
 /// </summary>
 /// <remarks>
-/// SQLite's surface is small, so a great deal is rejected rather than half-supported:
+/// Sqlite's surface is small, so a great deal is rejected rather than half-supported:
 /// <list type="bullet">
 /// <item>Foreign keys, unique constraints and check constraints cannot be added to a table after the fact
 /// (<c>ALTER TABLE</c> only does ADD/DROP/RENAME COLUMN and RENAME TABLE). They are therefore inlined into
@@ -33,9 +33,9 @@ namespace NSchema.SQLite.Sql;
 /// emits for that table are folded away. The same action against an <em>existing</em> table throws.</item>
 /// <item>In-place column changes (type, nullability, default, generated expression) and constraint add/drops on an
 /// existing table would each require a full table rebuild, which is not implemented; they throw.</item>
-/// <item>Features SQLite has no equivalent for (schemas other than <c>main</c>, sequences, enums, domains, composite
+/// <item>Features Sqlite has no equivalent for (schemas other than <c>main</c>, sequences, enums, domains, composite
 /// types, routines, grants, materialized views, triggers) throw.</item>
-/// <item>Comments are no-ops — SQLite has no <c>COMMENT ON</c>.</item>
+/// <item>Comments are no-ops — Sqlite has no <c>COMMENT ON</c>.</item>
 /// </list>
 /// </remarks>
 internal sealed class SqliteSqlGenerator : ISqlGenerator
@@ -46,7 +46,7 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
         var postDeploymentStatements = plan.PostDeploymentScripts.Select(s => new SqlStatement(s.Sql, s.RunOutsideTransaction));
 
         // Tables created in this plan: their foreign keys, unique and check constraints are inlined into the
-        // CREATE TABLE (SQLite can't ALTER TABLE ADD CONSTRAINT), so the separate Add* actions the linearizer emits
+        // CREATE TABLE (Sqlite can't ALTER TABLE ADD CONSTRAINT), so the separate Add* actions the linearizer emits
         // for these tables are folded away rather than emitted.
         var createdTables = plan.Actions
             .OfType<CreateTable>()
@@ -69,7 +69,7 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
         AddUniqueConstraint x => FoldedOrUnsupported(createdTables, x.SchemaName, x.TableName, "add a unique constraint to an existing table"),
         AddCheckConstraint x => FoldedOrUnsupported(createdTables, x.SchemaName, x.TableName, "add a check constraint to an existing table"),
 
-        // A plain view body change arrives as CreateView (the core relies on CREATE OR REPLACE); SQLite has none, so
+        // A plain view body change arrives as CreateView (the core relies on CREATE OR REPLACE); Sqlite has none, so
         // an idempotent DROP precedes the CREATE. This serves a fresh add too (the DROP is a no-op).
         CreateView { View.IsMaterialized: true } => throw Unsupported("materialized views"),
         CreateView x =>
@@ -78,7 +78,7 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
             new SqlStatement($"CREATE VIEW {Qualify(x.SchemaName, x.View.Name)} AS {x.View.Body}"),
         ],
 
-        // SQLite has no COMMENT ON, so every comment change is a no-op. (A consequence is that a desired schema
+        // Sqlite has no COMMENT ON, so every comment change is a no-op. (A consequence is that a desired schema
         // carrying doc comments will show those changes as perpetually pending; this is a documented limitation.)
         SetSchemaComment or SetTableComment or SetColumnComment or SetConstraintComment or SetIndexComment
             or SetViewComment or SetTriggerComment or SetSequenceComment or SetEnumComment or SetDomainComment
@@ -97,7 +97,7 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
         DropTable x => $"DROP TABLE {Qualify(x.SchemaName, x.TableName)}",
         RenameTable x => $"ALTER TABLE {Qualify(x.SchemaName, x.OldName)} RENAME TO \"{x.NewName}\"",
 
-        // ── Columns (only ADD / DROP / RENAME are native to SQLite) ──────────────
+        // ── Columns (only ADD / DROP / RENAME are native to Sqlite) ──────────────
         AddColumn x => $"ALTER TABLE {Qualify(x.SchemaName, x.TableName)} ADD COLUMN {BuildColumnDef(x.Column)}",
         DropColumn x => $"ALTER TABLE {Qualify(x.SchemaName, x.TableName)} DROP COLUMN \"{x.ColumnName}\"",
         RenameColumn x => $"ALTER TABLE {Qualify(x.SchemaName, x.TableName)} RENAME COLUMN \"{x.OldName}\" TO \"{x.NewName}\"",
@@ -122,16 +122,16 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
         // ── Views ───────────────────────────────────────────────────────────────
         DropView { IsMaterialized: true } => throw Unsupported("materialized views"),
         DropView x => $"DROP VIEW {Qualify(x.SchemaName, x.ViewName)}",
-        // SQLite has no ALTER VIEW ... RENAME, and the rename action does not carry the body needed to recreate it.
+        // Sqlite has no ALTER VIEW ... RENAME, and the rename action does not carry the body needed to recreate it.
         RenameView => throw Unsupported("renaming a view (drop and recreate it instead)"),
 
-        // ── Comments: SQLite has no COMMENT ON, so these are no-ops elsewhere; reaching here means a stray
+        // ── Comments: Sqlite has no COMMENT ON, so these are no-ops elsewhere; reaching here means a stray
         //    comment action was routed through the single-statement path, which should never happen.
 
-        // ── Features with no SQLite equivalent ───────────────────────────────────
+        // ── Features with no Sqlite equivalent ───────────────────────────────────
         CreateSchema or DropSchema or RenameSchema or GrantSchemaUsage or RevokeSchemaUsage =>
             throw Unsupported("schemas other than 'main'"),
-        CreateTrigger or DropTrigger => throw Unsupported("triggers (NSchema triggers call a function, which SQLite has no concept of)"),
+        CreateTrigger or DropTrigger => throw Unsupported("triggers (NSchema triggers call a function, which Sqlite has no concept of)"),
         CreateSequence or DropSequence or RenameSequence or AlterSequence => throw Unsupported("sequences"),
         CreateEnum or DropEnum or RenameEnum or AddEnumValue => throw Unsupported("enum types"),
         CreateDomain or DropDomain or RenameDomain or RecreateDomain or AlterDomainDefault or AlterDomainNotNull or AddDomainCheck or DropDomainCheck =>
@@ -155,9 +155,9 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
 
         var parts = table.Columns.Select(BuildColumnDef).ToList();
 
-        // Unlike a server database, SQLite cannot ALTER TABLE ADD CONSTRAINT, so every table constraint is created
+        // Unlike a server database, Sqlite cannot ALTER TABLE ADD CONSTRAINT, so every table constraint is created
         // inline here — the primary key, then unique and check constraints, then foreign keys. Only indexes arrive
-        // as separate actions (SQLite does support CREATE INDEX). See GenerateStatements / the linearizer.
+        // as separate actions (Sqlite does support CREATE INDEX). See GenerateStatements / the linearizer.
         if (table.PrimaryKey is { } pk)
         {
             parts.Add($"CONSTRAINT \"{pk.Name}\" PRIMARY KEY ({ColList(pk.ColumnNames)})");
@@ -185,7 +185,7 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
             """;
     }
 
-    // A SQLite foreign key references a table in the same database, so the referenced name is emitted unqualified
+    // A Sqlite foreign key references a table in the same database, so the referenced name is emitted unqualified
     // (a schema-qualified REFERENCES target is a syntax error). A NO ACTION rule is the engine default and is
     // omitted so it round-trips clean against PRAGMA foreign_key_list.
     private static string BuildInlineForeignKey(ForeignKey fk)
@@ -200,7 +200,7 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
         if (col.IsIdentity)
         {
             throw new NotSupportedException(
-                $"SQLite does not support identity columns (column '{col.Name}'). Model an auto-incrementing key as an INTEGER primary key (a rowid alias) instead.");
+                $"Sqlite does not support identity columns (column '{col.Name}'). Model an auto-incrementing key as an INTEGER primary key (a rowid alias) instead.");
         }
 
         var type = ToSqliteType(col.Type);
@@ -216,12 +216,12 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
         var idx = x.Index;
         if (idx.Method is not null)
         {
-            throw new NotSupportedException($"SQLite indexes have no access method (USING) — index '{idx.Name}' specifies '{idx.Method}'.");
+            throw new NotSupportedException($"Sqlite indexes have no access method (USING) — index '{idx.Name}' specifies '{idx.Method}'.");
         }
 
         if (idx.Include.Count > 0)
         {
-            throw new NotSupportedException($"SQLite indexes do not support INCLUDE columns — index '{idx.Name}'.");
+            throw new NotSupportedException($"Sqlite indexes do not support INCLUDE columns — index '{idx.Name}'.");
         }
 
         var keys = string.Join(", ", idx.Columns.Select(IndexKeyText));
@@ -231,12 +231,12 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
     }
 
     // A plain column key is quoted; an expression key is parenthesised and verbatim. ASC/DESC is emitted only when
-    // explicit. SQLite has no NULLS FIRST/LAST in an index, so a non-default null ordering is rejected.
+    // explicit. Sqlite has no NULLS FIRST/LAST in an index, so a non-default null ordering is rejected.
     private static string IndexKeyText(IndexColumn col)
     {
         if (col.Nulls != IndexNulls.Default)
         {
-            throw new NotSupportedException("SQLite indexes do not support NULLS FIRST / NULLS LAST ordering.");
+            throw new NotSupportedException("Sqlite indexes do not support NULLS FIRST / NULLS LAST ordering.");
         }
 
         var key = col.IsExpression ? $"({col.Expression})" : $"\"{col.Expression}\"";
@@ -251,7 +251,7 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    // SQLite stores a column's declared type verbatim and applies type affinity by name, so emitting NSchema's
+    // Sqlite stores a column's declared type verbatim and applies type affinity by name, so emitting NSchema's
     // canonical type string (e.g. "bigint", "varchar(255)", "decimal(18,2)") lets the introspector parse it straight
     // back with SqlType.Parse — no information is lost to affinity collapse.
     private static string ToSqliteType(SqlType type) => type.ToString();
@@ -270,8 +270,8 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
     };
 
     private static NotSupportedException Unsupported(string feature) =>
-        new($"SQLite does not support {feature}.");
+        new($"Sqlite does not support {feature}.");
 
     private static NotSupportedException RequiresRebuild(string operation) =>
-        new($"SQLite cannot {operation} in place; this requires rebuilding the table, which NSchema.SQLite does not support. Recreate the table instead.");
+        new($"Sqlite cannot {operation} in place; this requires rebuilding the table, which NSchema.Sqlite does not support. Recreate the table instead.");
 }

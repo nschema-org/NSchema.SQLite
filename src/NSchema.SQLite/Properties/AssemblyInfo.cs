@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("NSchema.SQLite.Tests")]
+[assembly: InternalsVisibleTo("NSchema.Sqlite.Tests")]
