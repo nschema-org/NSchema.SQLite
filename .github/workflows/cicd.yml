@@ -1,4 +1,4 @@
-name: NSchema.SQLite
+name: NSchema.Sqlite
 
 on:
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
         run: dotnet run --project build/src/NSchema.Build/NSchema.Build.csproj -- build
         shell: bash
         env:
-          Build__ProjectFile: 'src/NSchema.SQLite/NSchema.SQLite.csproj'
+          Build__ProjectFile: 'src/NSchema.Sqlite/NSchema.Sqlite.csproj'
 
   deploy:
     name: Deploy
@@ -48,6 +48,6 @@ jobs:
         shell: bash
         env:
           Build__NuGetApiKey: ${{ secrets.NUGET_API_KEY }}
-          Build__ProjectFile: 'src/NSchema.SQLite/NSchema.SQLite.csproj'
+          Build__ProjectFile: 'src/NSchema.Sqlite/NSchema.Sqlite.csproj'
           Build__CommitSha: ${{ github.sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

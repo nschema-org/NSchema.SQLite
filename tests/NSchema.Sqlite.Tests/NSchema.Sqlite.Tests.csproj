@@ -33,7 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\NSchema.SQLite\NSchema.SQLite.csproj" />
+    <ProjectReference Include="..\..\src\NSchema.Sqlite\NSchema.Sqlite.csproj" />
   </ItemGroup>
 
 </Project>

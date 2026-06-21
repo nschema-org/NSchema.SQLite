@@ -1,13 +1,13 @@
 using NSchema.Schema.Model.Columns;
 using NSchema.Schema.Model.Tables;
-using NSchema.SQLite.Tests.Fixtures;
+using NSchema.Sqlite.Tests.Fixtures;
 
-namespace NSchema.SQLite.Tests.Sql;
+namespace NSchema.Sqlite.Tests.Sql;
 
 /// <summary>
-/// Introspection-focused tests for <see cref="NSchema.SQLite.Sql.SqliteSchemaProvider"/>, including reading
+/// Introspection-focused tests for <see cref="NSchema.Sqlite.Sql.SqliteSchemaProvider"/>, including reading
 /// databases created by hand (not by the generator) to prove the <c>sqlite_master</c> SQL parsing recovers the
-/// constraint names and expressions that SQLite's PRAGMAs hide.
+/// constraint names and expressions that Sqlite's PRAGMAs hide.
 /// </summary>
 public sealed class SqliteSchemaProviderTests : SqliteTestBase
 {

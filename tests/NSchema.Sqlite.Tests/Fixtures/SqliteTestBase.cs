@@ -1,12 +1,12 @@
 using Microsoft.Data.Sqlite;
 using NSchema.Plan.Model;
 using NSchema.Schema.Model;
-using NSchema.SQLite.Sql;
+using NSchema.Sqlite.Sql;
 
-namespace NSchema.SQLite.Tests.Fixtures;
+namespace NSchema.Sqlite.Tests.Fixtures;
 
 /// <summary>
-/// Base for tests that exercise the generator and provider against a real SQLite database. SQLite is in-process,
+/// Base for tests that exercise the generator and provider against a real Sqlite database. Sqlite is in-process,
 /// so each test gets its own private temp-file database (no Docker, no container) and the generated DDL is run
 /// against it directly. A temp file — rather than <c>:memory:</c> — is used so the provider, which opens its own
 /// connection, sees the same database.

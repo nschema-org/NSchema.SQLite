@@ -1,10 +1,10 @@
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
 
-namespace NSchema.SQLite;
+namespace NSchema.Sqlite;
 
 /// <summary>
-/// The single connection seam for the SQLite provider: a <see cref="DbDataSource"/> over a SQLite connection string.
+/// The single connection seam for the Sqlite provider: a <see cref="DbDataSource"/> over a Sqlite connection string.
 /// </summary>
 internal sealed class SqliteConnectionSource(string connectionString) : DbDataSource
 {

@@ -8,10 +8,10 @@ using NSchema.Schema.Model.Schemas;
 using NSchema.Schema.Model.Tables;
 using NSchema.Schema.Model.Views;
 
-namespace NSchema.SQLite.Sql;
+namespace NSchema.Sqlite.Sql;
 
 /// <summary>
-/// Reads a live SQLite database into an NSchema <see cref="DatabaseSchema"/>.
+/// Reads a live Sqlite database into an NSchema <see cref="DatabaseSchema"/>.
 /// </summary>
 internal sealed class SqliteSchemaProvider(SqliteConnectionSource source) : ISchemaProvider
 {
@@ -19,7 +19,7 @@ internal sealed class SqliteSchemaProvider(SqliteConnectionSource source) : ISch
 
     public async ValueTask<DatabaseSchema> GetSchema(string[]? schemaNames = null, CancellationToken cancellationToken = default)
     {
-        // SQLite has one primary database, surfaced as 'main'. A scope that explicitly excludes it sees nothing.
+        // Sqlite has one primary database, surfaced as 'main'. A scope that explicitly excludes it sees nothing.
         if (schemaNames is { Length: > 0 } && !schemaNames.Contains(SchemaName, StringComparer.OrdinalIgnoreCase))
         {
             return new DatabaseSchema([]);
@@ -195,8 +195,8 @@ internal sealed class SqliteSchemaProvider(SqliteConnectionSource source) : ISch
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    // SQLite stores a column's declared type verbatim; the generator writes NSchema's canonical type string, so
-    // SqlType.Parse reverses it exactly. An untyped column (legal in SQLite) maps to BLOB affinity's nearest model.
+    // Sqlite stores a column's declared type verbatim; the generator writes NSchema's canonical type string, so
+    // SqlType.Parse reverses it exactly. An untyped column (legal in Sqlite) maps to BLOB affinity's nearest model.
     private static SqlType ParseType(string declaredType) =>
         string.IsNullOrWhiteSpace(declaredType) ? SqlType.VarBinary() : SqlType.Parse(declaredType);
 
