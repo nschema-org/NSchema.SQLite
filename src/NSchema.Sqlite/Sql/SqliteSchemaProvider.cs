@@ -6,6 +6,7 @@ using NSchema.Schema.Model.Constraints;
 using NSchema.Schema.Model.Indexes;
 using NSchema.Schema.Model.Schemas;
 using NSchema.Schema.Model.Tables;
+using NSchema.Schema.Model.Triggers;
 using NSchema.Schema.Model.Views;
 
 namespace NSchema.Sqlite.Sql;
@@ -33,10 +34,18 @@ internal sealed class SqliteSchemaProvider(SqliteConnectionSource source) : ISch
             .GroupBy(o => o.TableName)
             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
+        var triggersByTable = objects
+            .Where(o => o is { Type: "trigger", Sql: not null })
+            .GroupBy(o => o.TableName)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
         var tables = new List<Table>();
         foreach (var table in objects.Where(o => o.Type == "table").OrderBy(o => o.Name, StringComparer.Ordinal))
         {
-            tables.Add(await BuildTable(connection, table, indexesByTable.GetValueOrDefault(table.Name, []), cancellationToken));
+            tables.Add(await BuildTable(connection, table,
+                indexesByTable.GetValueOrDefault(table.Name, []),
+                triggersByTable.GetValueOrDefault(table.Name, []),
+                cancellationToken));
         }
 
         var views = objects
@@ -80,7 +89,7 @@ internal sealed class SqliteSchemaProvider(SqliteConnectionSource source) : ISch
 
     // ── Tables ───────────────────────────────────────────────────────────────
 
-    private static async Task<Table> BuildTable(DbConnection connection, MasterObject table, List<MasterObject> indexObjects, CancellationToken ct)
+    private static async Task<Table> BuildTable(DbConnection connection, MasterObject table, List<MasterObject> indexObjects, List<MasterObject> triggerObjects, CancellationToken ct)
     {
         var definition = table.Sql is not null ? SqliteDdl.ParseCreateTable(table.Sql) : null;
         var generated = definition?.GeneratedExpressions ?? new Dictionary<string, string>();
@@ -128,6 +137,12 @@ internal sealed class SqliteSchemaProvider(SqliteConnectionSource source) : ISch
             .Select(idx => idx!)
             .ToList();
 
+        var triggers = triggerObjects
+            .Select(o => BuildTrigger(o.Name, o.Sql!))
+            .Where(trigger => trigger is not null)
+            .Select(trigger => trigger!)
+            .ToList();
+
         return new Table(
             table.Name,
             PrimaryKey: primaryKey,
@@ -135,7 +150,20 @@ internal sealed class SqliteSchemaProvider(SqliteConnectionSource source) : ISch
             ForeignKeys: foreignKeys,
             UniqueConstraints: uniqueConstraints,
             CheckConstraints: checkConstraints,
-            Indexes: indexes);
+            Indexes: indexes,
+            Triggers: triggers);
+    }
+
+    // Sqlite triggers are inline-body (no function), single-event, and BEFORE/AFTER on a table. The name and table come
+    // from sqlite_master; the timing, event, optional WHEN and the BEGIN … END body are recovered from the stored SQL.
+    private static Trigger? BuildTrigger(string name, string sql)
+    {
+        var parsed = SqliteDdl.ParseCreateTrigger(sql);
+        return parsed is null
+            ? null
+            : new Trigger(name, parsed.Timing, parsed.Events, Function: null,
+                Level: parsed.ForEachRow ? TriggerLevel.Row : TriggerLevel.Statement,
+                UpdateOfColumns: parsed.UpdateOfColumns, When: parsed.When, Body: parsed.Body);
     }
 
     private static PrimaryKey? BuildPrimaryKey(string tableName, SqliteTableDefinition? definition, List<(string Name, int Position)> pragmaColumns)

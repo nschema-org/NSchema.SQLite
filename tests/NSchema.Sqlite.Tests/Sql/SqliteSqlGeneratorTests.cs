@@ -2,11 +2,13 @@ using NSchema.Plan.Model.Columns;
 using NSchema.Plan.Model.Constraints;
 using NSchema.Plan.Model.Indexes;
 using NSchema.Plan.Model.Tables;
+using NSchema.Plan.Model.Triggers;
 using NSchema.Plan.Model.Views;
 using NSchema.Schema.Model.Columns;
 using NSchema.Schema.Model.Constraints;
 using NSchema.Schema.Model.Indexes;
 using NSchema.Schema.Model.Tables;
+using NSchema.Schema.Model.Triggers;
 using NSchema.Schema.Model.Views;
 using NSchema.Sqlite.Tests.Fixtures;
 
@@ -142,6 +144,50 @@ public sealed class SqliteSqlGeneratorTests : SqliteTestBase
         await Apply(new DropView(Schema, "u"));
 
         (await Scalar<long>("SELECT COUNT(*) FROM sqlite_master WHERE name = 'u'")).ShouldBe(0);
+    }
+
+    // ── Triggers ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RoundTrip_Trigger_IntrospectsToTheSameStructureAndFires()
+    {
+        await Exec("CREATE TABLE \"users\" (id integer, email text, name text)");
+        await Exec("CREATE TABLE \"audit\" (msg text)");
+        // A trigger body can't use schema-qualified table names (a Sqlite rule), so it writes plain `audit`.
+        var trigger = new Trigger("users_audit", TriggerTiming.After, TriggerEvent.Update,
+            Level: TriggerLevel.Row, UpdateOfColumns: ["email"], When: "new.email IS NOT NULL",
+            Body: "BEGIN INSERT INTO audit (msg) VALUES (new.email); END");
+
+        await Apply(new CreateTrigger(Schema, "users", trigger));
+
+        // What was applied reads back identically — timing, single event, UPDATE OF, row-level, WHEN and the body
+        // (structural equality excludes the comment).
+        var introspected = (await Introspect()).Schemas[0].Tables.Single(t => t.Name == "users").Triggers.ShouldHaveSingleItem();
+        introspected.ShouldBe(trigger);
+        introspected.Function.ShouldBeNull();
+
+        // The trigger actually fires: updating the email lands an audit row.
+        await Exec("INSERT INTO \"users\" (id, email) VALUES (1, 'a@b.com')");
+        await Exec("UPDATE \"users\" SET email = 'c@d.com' WHERE id = 1");
+        (await Scalar<long>("SELECT COUNT(*) FROM audit WHERE msg = 'c@d.com'")).ShouldBe(1);
+
+        await Apply(new DropTrigger(Schema, "users", "users_audit"));
+        (await Scalar<long>("SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = 'users_audit'")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task RoundTrip_BeforeDeleteTrigger_WithoutForEachRow_IntrospectsAsStatementLevel()
+    {
+        // No FOR EACH ROW emitted (Level defaults to Statement), so introspection reads it back as Statement —
+        // a faithful round-trip even though Sqlite physically fires per row.
+        await Exec("CREATE TABLE \"users\" (id integer)");
+        await Exec("CREATE TABLE \"audit\" (msg text)");
+        var trigger = new Trigger("users_block", TriggerTiming.Before, TriggerEvent.Delete,
+            Body: "BEGIN INSERT INTO audit (msg) VALUES ('deleting'); END");
+
+        await Apply(new CreateTrigger(Schema, "users", trigger));
+
+        (await Introspect()).Schemas[0].Tables.Single(t => t.Name == "users").Triggers.ShouldHaveSingleItem().ShouldBe(trigger);
     }
 
     // ── Round-trips (generate → execute → introspect) ───────────────────────────

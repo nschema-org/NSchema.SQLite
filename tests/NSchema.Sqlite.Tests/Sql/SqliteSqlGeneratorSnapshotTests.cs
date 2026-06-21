@@ -122,6 +122,36 @@ public sealed class SqliteSqlGeneratorSnapshotTests
         new CreateView(Schema, new View("active_users", "SELECT id, email FROM main.users WHERE active")),
         new DropView(Schema, "active_users"));
 
+    // ── Triggers (inline body; single event) ─────────────────────────────────────
+
+    [Fact]
+    public Task TriggerOperations() => VerifyPlan(
+        // AFTER … FOR EACH ROW with an inline body. (A trigger body can't use schema-qualified table names in Sqlite.)
+        new CreateTrigger(Schema, "users", new Trigger("users_audit", TriggerTiming.After, TriggerEvent.Insert,
+            Level: TriggerLevel.Row, Body: "BEGIN INSERT INTO audit (msg) VALUES ('inserted'); END")),
+        // BEFORE UPDATE OF (cols) with a WHEN guard.
+        new CreateTrigger(Schema, "users", new Trigger("users_guard", TriggerTiming.Before, TriggerEvent.Update,
+            Level: TriggerLevel.Row, UpdateOfColumns: ["email", "name"], When: "new.email IS NOT NULL",
+            Body: "BEGIN INSERT INTO audit (msg) VALUES ('updated'); END")),
+        // No explicit level → no FOR EACH ROW emitted.
+        new CreateTrigger(Schema, "users", new Trigger("users_cleanup", TriggerTiming.After, TriggerEvent.Delete,
+            Body: "BEGIN DELETE FROM audit WHERE msg = old.email; END")),
+        // Sqlite has no COMMENT ON, so a trigger comment is a no-op (contributes no statement).
+        new SetTriggerComment(Schema, "users", "users_audit", null, "audit inserts"),
+        new DropTrigger(Schema, "users", "users_audit"));
+
+    [Fact]
+    public void MultiEventTrigger_IsRejected() =>
+        Should.Throw<NotSupportedException>(() => Generator.Generate(new MigrationPlan(
+            [new CreateTrigger(Schema, "users", new Trigger("t", TriggerTiming.After,
+                TriggerEvent.Insert | TriggerEvent.Update, Level: TriggerLevel.Row, Body: "BEGIN END"))], [], [])));
+
+    [Fact]
+    public void InsteadOfTrigger_IsRejected() =>
+        Should.Throw<NotSupportedException>(() => Generator.Generate(new MigrationPlan(
+            [new CreateTrigger(Schema, "users", new Trigger("t", TriggerTiming.InsteadOf,
+                TriggerEvent.Insert, Level: TriggerLevel.Row, Body: "BEGIN END"))], [], [])));
+
     // ── Type mapping (canonical NSchema type names, applied via CREATE TABLE) ────
 
     [Fact]
