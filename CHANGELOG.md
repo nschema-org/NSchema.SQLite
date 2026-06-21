@@ -10,6 +10,16 @@ This package uses **lockstep major versioning** with the `NSchema.Core` package:
 
 As a consequence, breaking changes that are specific to this provider (rather than the core API) are signalled by a **minor version bump** rather than a major one, and called out explicitly in this changelog.
 
+## [3.2.0] - 2026-06-21
+
+### Added
+
+- **Triggers.** SQLite triggers run an inline `BEGIN … END` body, which the provider now supports, using the inline trigger `Body` added in `NSchema.Core` 3.2.0. A trigger is generated as `CREATE TRIGGER … {BEFORE|AFTER} {event} ON t [FOR EACH ROW] [WHEN (…)] BEGIN … END` and recovered from `sqlite_master`.
+
+### Changed
+
+- Bumped the `NSchema.Core` dependency to `3.2.0`.
+
 ## [3.1.0] - 2026-06-21
 
 ## Changed

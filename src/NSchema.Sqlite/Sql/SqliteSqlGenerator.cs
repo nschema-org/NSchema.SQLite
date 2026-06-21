@@ -15,6 +15,7 @@ using NSchema.Plan.Model.Views;
 using NSchema.Schema.Model.Columns;
 using NSchema.Schema.Model.Indexes;
 using NSchema.Schema.Model.Tables;
+using NSchema.Schema.Model.Triggers;
 using NSchema.Sql;
 using NSchema.Sql.Model;
 
@@ -125,13 +126,16 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
         // Sqlite has no ALTER VIEW ... RENAME, and the rename action does not carry the body needed to recreate it.
         RenameView => throw Unsupported("renaming a view (drop and recreate it instead)"),
 
+        // ── Triggers (inline body; Sqlite has no CREATE OR REPLACE, so a change is a drop + recreate) ──
+        CreateTrigger x => BuildCreateTrigger(x),
+        DropTrigger x => $"DROP TRIGGER {Qualify(x.SchemaName, x.TriggerName)}",
+
         // ── Comments: Sqlite has no COMMENT ON, so these are no-ops elsewhere; reaching here means a stray
         //    comment action was routed through the single-statement path, which should never happen.
 
         // ── Features with no Sqlite equivalent ───────────────────────────────────
         CreateSchema or DropSchema or RenameSchema or GrantSchemaUsage or RevokeSchemaUsage =>
             throw Unsupported("schemas other than 'main'"),
-        CreateTrigger or DropTrigger => throw Unsupported("triggers (NSchema triggers call a function, which Sqlite has no concept of)"),
         CreateSequence or DropSequence or RenameSequence or AlterSequence => throw Unsupported("sequences"),
         CreateEnum or DropEnum or RenameEnum or AddEnumValue => throw Unsupported("enum types"),
         CreateDomain or DropDomain or RenameDomain or RecreateDomain or AlterDomainDefault or AlterDomainNotNull or AddDomainCheck or DropDomainCheck =>
@@ -247,6 +251,58 @@ internal sealed class SqliteSqlGenerator : ISqlGenerator
             _ => "",
         };
         return $"{key}{sort}";
+    }
+
+    // ── Triggers ──────────────────────────────────────────────────────────────────
+
+    // CREATE TRIGGER "main"."name" {BEFORE|AFTER} {event} ON "table" [FOR EACH ROW] [WHEN (expr)] <body>. Sqlite triggers
+    // run an inline body (there are no functions to call), fire on a single event, and INSTEAD OF is for views only —
+    // facets the model carries but Sqlite cannot express are rejected loudly. The body is the verbatim BEGIN … END block.
+    private static string BuildCreateTrigger(CreateTrigger x)
+    {
+        var trigger = x.Trigger;
+        if (trigger.Body is not { } body)
+        {
+            throw new NotSupportedException(
+                $"Sqlite triggers run an inline body, but trigger '{trigger.Name}' has none (it calls a function). Sqlite has no stored functions; declare it with an AS $$ … $$ body.");
+        }
+
+        if (trigger.Timing == TriggerTiming.InsteadOf)
+        {
+            throw Unsupported("INSTEAD OF triggers (Sqlite supports them only on views, and NSchema attaches triggers to tables)");
+        }
+
+        if (trigger.Events.HasFlag(TriggerEvent.Truncate))
+        {
+            throw Unsupported("TRUNCATE triggers");
+        }
+
+        if (trigger.Events is not (TriggerEvent.Insert or TriggerEvent.Update or TriggerEvent.Delete))
+        {
+            throw new NotSupportedException(
+                $"Sqlite triggers fire on a single event, but trigger '{trigger.Name}' lists more than one. Declare a separate trigger per event.");
+        }
+
+        var timing = trigger.Timing == TriggerTiming.Before ? "BEFORE" : "AFTER";
+        var forEachRow = trigger.Level == TriggerLevel.Row ? " FOR EACH ROW" : "";
+        var when = trigger.When is { } w ? $" WHEN ({w})" : "";
+        return $"CREATE TRIGGER {Qualify(x.SchemaName, trigger.Name)} {timing} {TriggerEventText(trigger)} ON \"{x.TableName}\"{forEachRow}{when} {body}";
+    }
+
+    // The single fired event. UPDATE may be narrowed to columns (written unparenthesised, as Sqlite expects).
+    private static string TriggerEventText(Trigger trigger)
+    {
+        if (trigger.Events.HasFlag(TriggerEvent.Insert))
+        {
+            return "INSERT";
+        }
+
+        if (trigger.Events.HasFlag(TriggerEvent.Delete))
+        {
+            return "DELETE";
+        }
+
+        return trigger.UpdateOfColumns.Count > 0 ? $"UPDATE OF {ColList(trigger.UpdateOfColumns)}" : "UPDATE";
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────

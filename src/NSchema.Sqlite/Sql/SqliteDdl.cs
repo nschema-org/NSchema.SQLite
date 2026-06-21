@@ -1,5 +1,6 @@
 using NSchema.Schema.Model.Indexes;
 using NSchema.Schema.Model.Tables;
+using NSchema.Schema.Model.Triggers;
 
 namespace NSchema.Sqlite.Sql;
 
@@ -15,13 +16,24 @@ namespace NSchema.Sqlite.Sql;
 
 internal enum SqliteTokenKind
 {
-    /// <summary>A bareword (keyword, number, or unquoted identifier) or an unquoted-here quoted identifier.</summary>
+    /// <summary>
+    /// A bareword (keyword, number, or unquoted identifier) or an unquoted-here quoted identifier.
+    /// </summary>
     Word,
-    /// <summary>A single-quoted string literal, captured raw including its quotes.</summary>
+
+    /// <summary>
+    /// A single-quoted string literal, captured raw including its quotes.
+    /// </summary>
     String,
-    /// <summary>A balanced parenthesised run, captured as its inner text (without the outer parentheses).</summary>
+
+    /// <summary>
+    /// A balanced parenthesised run, captured as its inner text (without the outer parentheses).
+    /// </summary>
     Parens,
-    /// <summary>A single punctuation character (comma, dot, operator, …).</summary>
+
+    /// <summary>
+    /// A single punctuation character (comma, dot, operator, …).
+    /// </summary>
     Symbol,
 }
 
@@ -55,6 +67,14 @@ internal sealed record SqliteIndexDefinition(
     bool IsUnique,
     IReadOnlyList<IndexColumn> Columns,
     string? Predicate);
+
+internal sealed record ParsedTrigger(
+    TriggerTiming Timing,
+    TriggerEvent Events,
+    IReadOnlyList<string> UpdateOfColumns,
+    bool ForEachRow,
+    string? When,
+    string Body);
 
 internal static class SqliteDdl
 {
@@ -526,12 +546,142 @@ internal static class SqliteDdl
     /// <summary>Extracts a view's body — everything after the first top-level <c>AS</c> — or the input if none is found.</summary>
     public static string ExtractViewBody(string sql) => ExtractAfterKeyword(sql, "AS") ?? sql.Trim();
 
+    // ── CREATE TRIGGER ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Parses a <c>CREATE TRIGGER</c> statement (the verbatim text Sqlite keeps in <c>sqlite_master.sql</c>) into its
+    /// timing, event, optional <c>WHEN</c> condition, and inline <c>BEGIN … END</c> body. Returns <see langword="null"/>
+    /// on anything that does not look like a trigger. Like the rest of this parser it is deliberately tolerant; the
+    /// trigger's name and table come from <c>sqlite_master</c>, so only the parts PRAGMAs can't supply are recovered here.
+    /// </summary>
+    public static ParsedTrigger? ParseCreateTrigger(string sql)
+    {
+        // The body is the top-level BEGIN … END; everything before it is the header (timing / event / WHEN).
+        var beginIndex = TopLevelWordIndex(sql, "BEGIN");
+        if (beginIndex < 0)
+        {
+            return null;
+        }
+
+        var body = sql[beginIndex..].Trim();
+        var header = sql[..beginIndex];
+
+        // A WHEN condition (if present) runs from the WHEN keyword to the body; lift it out of the header so the
+        // event scan below doesn't see anything inside it.
+        string? when = null;
+        var whenIndex = TopLevelWordIndex(header, "WHEN");
+        if (whenIndex >= 0)
+        {
+            when = StripEnclosingParens(header[(whenIndex + "WHEN".Length)..].Trim());
+            header = header[..whenIndex];
+        }
+
+        var tokens = Tokenize(header);
+        var (events, updateOfColumns) = ParseTriggerEvents(tokens);
+        if (events == TriggerEvent.None)
+        {
+            return null;
+        }
+
+        return new ParsedTrigger(ParseTriggerTiming(tokens), events, updateOfColumns,
+            ContainsSequence(tokens, "FOR", "EACH", "ROW"), when, body);
+    }
+
+    // Sqlite's default when no timing keyword is present is BEFORE; an NSchema-generated trigger always states one.
+    private static TriggerTiming ParseTriggerTiming(List<SqliteToken> tokens)
+    {
+        for (var i = 0; i < tokens.Count; i++)
+        {
+            if (tokens[i].IsWord("AFTER"))
+            {
+                return TriggerTiming.After;
+            }
+
+            if (tokens[i].IsWord("INSTEAD") && i + 1 < tokens.Count && tokens[i + 1].IsWord("OF"))
+            {
+                return TriggerTiming.InsteadOf;
+            }
+
+            if (tokens[i].IsWord("BEFORE"))
+            {
+                return TriggerTiming.Before;
+            }
+        }
+
+        return TriggerTiming.Before;
+    }
+
+    // A Sqlite trigger fires on exactly one event. `UPDATE OF a, b` lists the columns (unparenthesised) up to ON.
+    private static (TriggerEvent Events, IReadOnlyList<string> UpdateOfColumns) ParseTriggerEvents(List<SqliteToken> tokens)
+    {
+        var updateOf = new List<string>();
+        for (var i = 0; i < tokens.Count; i++)
+        {
+            if (tokens[i].IsWord("INSERT"))
+            {
+                return (TriggerEvent.Insert, updateOf);
+            }
+
+            if (tokens[i].IsWord("DELETE"))
+            {
+                return (TriggerEvent.Delete, updateOf);
+            }
+
+            if (tokens[i].IsWord("UPDATE"))
+            {
+                if (i + 1 < tokens.Count && tokens[i + 1].IsWord("OF"))
+                {
+                    for (var j = i + 2; j < tokens.Count && !tokens[j].IsWord("ON"); j++)
+                    {
+                        if (tokens[j].Kind == SqliteTokenKind.Word)
+                        {
+                            updateOf.Add(tokens[j].Text);
+                        }
+                    }
+                }
+
+                return (TriggerEvent.Update, updateOf);
+            }
+        }
+
+        return (TriggerEvent.None, updateOf);
+    }
+
+    private static bool ContainsSequence(List<SqliteToken> tokens, params string[] words)
+    {
+        for (var i = 0; i + words.Length <= tokens.Count; i++)
+        {
+            var matched = true;
+            for (var j = 0; j < words.Length; j++)
+            {
+                if (!tokens[i + j].IsWord(words[j]))
+                {
+                    matched = false;
+                    break;
+                }
+            }
+
+            if (matched)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // ── Shared helpers ──────────────────────────────────────────────────────────
 
-    // Returns the verbatim source text following the first top-level occurrence of the keyword (case-insensitive,
-    // ignoring matches inside quotes/strings/parens), trimmed. Used for a view body and an index predicate, where
-    // the original text must be preserved (the core normalizes view bodies only cosmetically).
+    // Returns the verbatim source text following the first top-level occurrence of the keyword, trimmed.
     private static string? ExtractAfterKeyword(string sql, string keyword)
+    {
+        var index = TopLevelWordIndex(sql, keyword);
+        return index < 0 ? null : sql[(index + keyword.Length)..].Trim();
+    }
+
+    // Returns the start offset of the first top-level occurrence of the keyword (case-insensitive, ignoring matches
+    // inside quotes/strings/parens), or -1. Used to split a view body, an index predicate, and a trigger header/body.
+    private static int TopLevelWordIndex(string sql, string keyword)
     {
         var i = 0;
         while (i < sql.Length)
@@ -563,7 +713,7 @@ internal static class SqliteDdl
 
                 if (string.Equals(sql[start..i], keyword, StringComparison.OrdinalIgnoreCase))
                 {
-                    return sql[i..].Trim();
+                    return start;
                 }
 
                 continue;
@@ -572,7 +722,35 @@ internal static class SqliteDdl
             i++;
         }
 
-        return null;
+        return -1;
+    }
+
+    // Strips every parenthesis pair that fully encloses the whole expression (Sqlite's WHEN is captured paren-stripped,
+    // so a generated `WHEN (expr)` round-trips back to `expr`). Inner grouping parens are left intact.
+    private static string? StripEnclosingParens(string value)
+    {
+        value = value.Trim();
+        while (value.Length >= 2 && value[0] == '(' && Encloses(value))
+        {
+            value = value[1..^1].Trim();
+        }
+
+        return value.Length == 0 ? null : value;
+    }
+
+    private static bool Encloses(string value)
+    {
+        var depth = 0;
+        for (var i = 0; i < value.Length; i++)
+        {
+            depth += value[i] switch { '(' => 1, ')' => -1, _ => 0 };
+            if (depth == 0)
+            {
+                return i == value.Length - 1;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsConstraintKeyword(SqliteToken token) =>
