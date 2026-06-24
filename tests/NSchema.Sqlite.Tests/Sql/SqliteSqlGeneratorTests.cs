@@ -62,6 +62,19 @@ public sealed class SqliteSqlGeneratorTests : SqliteTestBase
     }
 
     [Fact]
+    public async Task Apply_CreateSchemaMain_IsANoOp_AndTheTableStillLands()
+    {
+        // Planning against a state store that does not record the implicit 'main' schema emits CreateSchema("main")
+        // ahead of the table. 'main' always exists, so that action must be a no-op (not a throw), and the table that
+        // follows it must still be created.
+        await Apply(
+            new CreateSchema(Schema),
+            new CreateTable(Schema, new Table("widgets", Columns: [new Column("id", SqlType.Int, IsNullable: false)])));
+
+        (await Scalar<long>("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'widgets'")).ShouldBe(1);
+    }
+
+    [Fact]
     public async Task RenameTable_RenamesTable()
     {
         await Exec("CREATE TABLE \"old_name\" (id integer)");
