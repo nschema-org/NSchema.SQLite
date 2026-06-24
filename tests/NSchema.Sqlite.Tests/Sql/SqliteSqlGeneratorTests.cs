@@ -1,6 +1,7 @@
 using NSchema.Plan.Model.Columns;
 using NSchema.Plan.Model.Constraints;
 using NSchema.Plan.Model.Indexes;
+using NSchema.Plan.Model.Schemas;
 using NSchema.Plan.Model.Tables;
 using NSchema.Plan.Model.Triggers;
 using NSchema.Plan.Model.Views;
@@ -46,6 +47,31 @@ public sealed class SqliteSqlGeneratorTests : SqliteTestBase
         await Apply(new DropTable(Schema, "products"));
 
         (await Scalar<long>("SELECT COUNT(*) FROM sqlite_master WHERE name = 'products'")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Destroy_DropsTablesThenNoOpsTheMainSchema()
+    {
+        await Exec("CREATE TABLE \"widgets\" (id integer)");
+
+        // A destroy now emits the explicit table drop plus DropSchema("main"). The implicit 'main' schema can't be
+        // dropped, so that action is a no-op rather than a throw — and the table is still removed.
+        await Apply(new DropTable(Schema, "widgets"), new DropSchema(Schema));
+
+        (await Scalar<long>("SELECT COUNT(*) FROM sqlite_master WHERE name = 'widgets'")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Apply_CreateSchemaMain_IsANoOp_AndTheTableStillLands()
+    {
+        // Planning against a state store that does not record the implicit 'main' schema emits CreateSchema("main")
+        // ahead of the table. 'main' always exists, so that action must be a no-op (not a throw), and the table that
+        // follows it must still be created.
+        await Apply(
+            new CreateSchema(Schema),
+            new CreateTable(Schema, new Table("widgets", Columns: [new Column("id", SqlType.Int, IsNullable: false)])));
+
+        (await Scalar<long>("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'widgets'")).ShouldBe(1);
     }
 
     [Fact]
