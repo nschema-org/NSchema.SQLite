@@ -9,6 +9,7 @@ namespace NSchema.Sqlite.Tests;
 /// unit tests — no Docker. The <c>NSCHEMA_SQLITE_CONNECTION_STRING</c> variable is snapshotted and cleared so
 /// a developer's ambient environment cannot make the outcome non-deterministic.
 /// </summary>
+[Collection("sqlite-environment")]
 public sealed class SqlitePluginTests : IDisposable
 {
     private const string EnvConnectionString = "NSCHEMA_SQLITE_CONNECTION_STRING";

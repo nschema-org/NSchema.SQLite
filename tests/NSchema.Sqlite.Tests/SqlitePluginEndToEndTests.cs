@@ -11,6 +11,7 @@ namespace NSchema.Sqlite.Tests;
 /// migration THROUGH the plugin's <c>Configure</c> (not the direct <c>UseSqliteSchema</c> API) against a real (temp
 /// file) SQLite database, then re-introspects to confirm the schema was applied. In-process — no Docker.
 /// </summary>
+[Collection("sqlite-environment")]
 public sealed class SqlitePluginEndToEndTests : SqliteTestBase
 {
     /// <summary>
